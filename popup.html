@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Data Gatherer</title>
+    <style>
+        .reviewButton {
+            /* Add your styles for the review button here */
+        }
+
+        .reviewModal {
+            /* Styles for the review modal */
+        }
+    </style>
+</head>
+<body>
+    <input type="text" id="chatMessageInput" placeholder="Enter your message">
+    <button id="sendChatMessageButton">Send</button>
+
+    <!-- First, load Firebase scripts -->
+    <script src="firebase-app-compat.js"></script>
+    <script src="firebase-database-compat.js"></script>
+    <script src="firebase.js"></script>
+
+    <!-- Then, load your popup script -->
+    <script src="popup.js"></script>
+</body>
+</html>

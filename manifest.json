@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Adloxs Sand Box 2",
+  "version": "1.0",
+  "description": "Gathers data from YouTube Studio.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [ "tabs", "activeTab", "storage", "scripting", "https://www.googleapis.com/"],
+  "host_permissions": [
+    "*://studio.youtube.com/*",
+    "*://www.youtube.com/*"
+],
+"content_scripts": [
+    {
+        "matches": ["*://studio.youtube.com/*", "*://www.youtube.com/watch?v=*"],
+      "js": [ "firebase-app-compat.js", "firebase-database-compat.js", "content.js" ],
+        "run_at": "document_end"
+    }
+]
+
+}
