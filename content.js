@@ -1,4 +1,4 @@
-﻿console.log("content.js loaded");
+console.log("content.js loaded");
 // Your Firebase config
 let discordIdsArray = [];
 
@@ -26,7 +26,7 @@ databaseRef.once('value').then(snapshot => {
 
 const thumbnailsRef = firebase.database().ref('thumbnails');
 
-function moveThumbnailToNode(discordId, thumbnailKey, targetNode, comment) {
+function moveThumbnailToNode(discordId, thumbnailKey, targetNode, comment, messageId) {
     return new Promise((resolve, reject) => {
         // Fetch the thumbnail data using the Discord ID and thumbnailKey
         thumbnailsRef.child(discordId).child('pending').child(thumbnailKey).once('value', snapshot => {
@@ -37,7 +37,9 @@ function moveThumbnailToNode(discordId, thumbnailKey, targetNode, comment) {
                 if (comment) {
                     thumbnailData.comment = comment;
                 }
-
+                if (messageId) {
+                    thumbnailData.message_id = messageId;
+                }
                 // Move the thumbnail data to the target node using the Discord ID and thumbnailKey
                 thumbnailsRef.child(discordId).child(targetNode).child(thumbnailKey).set(thumbnailData, error => {
                     if (error) {
@@ -62,18 +64,21 @@ function moveThumbnailToNode(discordId, thumbnailKey, targetNode, comment) {
     });
 }
 
-
-
-
 function fetchPendingThumbnailsForDiscordId(discordId) {
     return new Promise((resolve, reject) => {
         thumbnailsRef.child(discordId).child('pending').once('value', snapshot => {
             if (snapshot.exists()) {
-                const thumbnailsData = snapshot.val();
-                const thumbnailInfo = Object.values(thumbnailsData).map(data => ({
-                    url: data.thumbnail,
-                    discordId: discordId  // Include the Discord ID
-                }));
+                const thumbnailInfo = [];
+                snapshot.forEach(childSnapshot => {
+                    const key = childSnapshot.key;
+                    const data = childSnapshot.val();
+                    thumbnailInfo.push({
+                        key: key,
+                        url: data.thumbnail,
+                        discordId: discordId,  // Include the Discord ID
+                        messageId: data.Message_id  // Include the message_id
+                    });
+                });
                 resolve(thumbnailInfo);
             } else {
                 resolve([]); // No thumbnails found in 'pending' for this Discord ID
@@ -83,7 +88,6 @@ function fetchPendingThumbnailsForDiscordId(discordId) {
         });
     });
 }
-
 
 
 // Modify the fetchAssociatedThumbnails function to return the thumbnails
@@ -140,7 +144,7 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
     reviewBox.style.border = '1px solid grey';
     reviewBox.style.padding = '10px';
     reviewBox.style.position = 'fixed';
-    reviewBox.style.top = '117px';
+    reviewBox.style.top = '72px';
     reviewBox.style.left = '20.5%';
     reviewBox.style.backgroundColor = '#fff';
     reviewBox.style.zIndex = '1000';
@@ -182,9 +186,10 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
         };
 
         const desc = document.createElement('div');
-        desc.innerText = info.url;  // Display the URL as description (or modify as needed)
+        desc.innerText = info.comment || "No Title Available";  // This is where you can define what is displayed in description next to image
         desc.style.flexGrow = '1';
-        desc.style.fontSize = '14px';
+        desc.style.fontFamily = "YouTube Sans, sans-serif";
+        desc.style.fontSize = '15px';
         desc.className = 'description';
 
         container.appendChild(img);
@@ -252,11 +257,7 @@ function addReviewButton() {
         desc.innerText = thumbnail.description;
         desc.style.flexGrow = '1';
         desc.style.fontSize = '14px';  // Updated font size
-        desc.className = 'description';
-
-        container.appendChild(img);
-        container.appendChild(desc);
-        reviewBox.appendChild(container);
+        desc.className = 'description';      
     });
 
 
