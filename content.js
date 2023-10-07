@@ -11,7 +11,7 @@ const firebaseConfig = {
     messagingSenderId: "133751828740",
     appId: "1:133751828740:web:fc60dfda95c866a6846051"
 };
-const BOT_TOKEN = 'MTE0OTA5MTM1MTAzMjUwNDM3MA.GSaI_5.wb1dIbVg0X2sRAF8hM6905GaW5zn7RBOQ5K92Y';
+const BOT_TOKEN = 'BOT_TOKEN';
 const API_BASE_URL = 'https://discord.com/api/v10';
 
 function updateDiscordMessage(channelId, messageId, content, embedColor, reaction) {
