@@ -11,6 +11,39 @@ const firebaseConfig = {
     messagingSenderId: "133751828740",
     appId: "1:133751828740:web:fc60dfda95c866a6846051"
 };
+const BOT_TOKEN = 'MTE0OTA5MTM1MTAzMjUwNDM3MA.GSaI_5.wb1dIbVg0X2sRAF8hM6905GaW5zn7RBOQ5K92Y';
+const API_BASE_URL = 'https://discord.com/api/v10';
+
+function updateDiscordMessage(channelId, messageId, content, embedColor, reaction) {
+    // Update the message content and embed color
+    fetch(`${API_BASE_URL}/channels/${channelId}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bot ${BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            content: content,
+            embeds: [{
+                color: embedColor
+            }]
+        })
+    })
+        .then(response => {
+    console.log("Discord API Response:", response);
+    return response.json();
+})
+.then(data => {
+    console.log("Parsed Response Data:", data);
+    sendResponse(data);
+})
+.catch(error => {
+    console.error("Error in API call:", error);
+    sendResponse({error: error.message});
+});
+
+}
+
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
@@ -179,6 +212,9 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
         img.setAttribute('data-src', info.url);
         img.setAttribute('data-discord-id', info.discordId);
         img.setAttribute('data-thumbnail-key', info.key);  // Store the thumbnail key
+        img.setAttribute('data-message-id', info.messageId); // Set the message ID
+        img.setAttribute('data-channel-id', info.channelId); // Set the channel ID
+
         console.log("Thumbnail key for image:", img.getAttribute('data-thumbnail-key'));
 
         img.onclick = function () {
@@ -316,10 +352,14 @@ function viewImageFullscreen(imageUrl) {
         const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
         const thumbnailKey = associatedThumbnailElement.getAttribute('data-thumbnail-key');  // Retrieve the thumbnail key
         const discordId = associatedThumbnailElement.getAttribute('data-discord-id');  // Retrieve the Discord ID
+        const messageId = associatedThumbnailElement.getAttribute('data-message-id'); // Get the message ID
+        const channelId = associatedThumbnailElement.getAttribute('data-channel-id'); // Get the channel ID
 
         moveThumbnailToNode(discordId, thumbnailKey, 'approved')
             .then(() => {
                 console.log('Thumbnail moved to approved.');
+                // Update the Discord message for approval
+                updateDiscordMessage(channelId, messageId, 'Approved', 5308165, '✅');
             })
             .catch(error => {
                 console.error('Error moving thumbnail:', error);
@@ -345,11 +385,12 @@ function viewImageFullscreen(imageUrl) {
             const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
             const thumbnailKey = associatedThumbnailElement.getAttribute('data-thumbnail-key');  // Retrieve the thumbnail key
             const discordId = associatedThumbnailElement.getAttribute('data-discord-id');  // Retrieve the Discord ID
-
+            const messageId = associatedThumbnailElement.getAttribute('data-message-id'); // Get the message ID
 
             moveThumbnailToNode(discordId, thumbnailKey, 'revise', comment)
                 .then(() => {
                     console.log('Thumbnail moved to revise with comment.');
+                    updateDiscordMessage(channelId, messageId, `Revised: ${comment}`, 13063773, '❌');
                 })
                 .catch(error => {
                     console.error('Error moving thumbnail:', error);
