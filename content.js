@@ -1,141 +1,10 @@
 console.log("content.js loaded");
-// Your Firebase config
+
+let fullscreenClosed = false;
+let reviewBoxVisible = false;
+let fullscreenClicked = false;
 let discordIdsArray = [];
-
-const firebaseConfig = {
-    apiKey: "AIzaSyDUb2l9-4Ym4JyinFVj-mudq9svWKQZR0c",
-    authDomain: "adloxs-approval-v1.firebaseapp.com",
-    databaseURL: "https://adloxs-approval-v1-default-rtdb.firebaseio.com",
-    projectId: "adloxs-approval-v1",
-    storageBucket: "adloxs-approval-v1.appspot.com",
-    messagingSenderId: "133751828740",
-    appId: "1:133751828740:web:fc60dfda95c866a6846051"
-};
-const BOT_TOKEN = 'BOT_TOKEN';
-const API_BASE_URL = 'https://discord.com/api/v10';
-
-function updateDiscordMessage(channelId, messageId, content, embedColor, reaction) {
-    // Update the message content and embed color
-    fetch(`${API_BASE_URL}/channels/${channelId}/messages/${messageId}`, {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bot ${BOT_TOKEN}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            content: content,
-            embeds: [{
-                color: embedColor
-            }]
-        })
-    })
-        .then(response => {
-    console.log("Discord API Response:", response);
-    return response.json();
-})
-.then(data => {
-    console.log("Parsed Response Data:", data);
-    sendResponse(data);
-})
-.catch(error => {
-    console.error("Error in API call:", error);
-    sendResponse({error: error.message});
-});
-
-}
-
-
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const databaseRef = firebase.database().ref();
-
-databaseRef.once('value').then(snapshot => {
-    const data = snapshot.val();
-    console.log(data);  // You can display this data in your popup or use as needed.
-}).catch(error => {
-    console.error("Error fetching data:", error);
-});
-
-const thumbnailsRef = firebase.database().ref('thumbnails');
-
-function moveThumbnailToNode(discordId, thumbnailKey, targetNode, comment, messageId) {
-    return new Promise((resolve, reject) => {
-        // Fetch the thumbnail data using the Discord ID and thumbnailKey
-        thumbnailsRef.child(discordId).child('pending').child(thumbnailKey).once('value', snapshot => {
-            if (snapshot.exists()) {
-                const thumbnailData = snapshot.val();
-
-                // If there's a comment, add it to the thumbnail data
-                if (comment) {
-                    thumbnailData.comment = comment;
-                }
-                if (messageId) {
-                    thumbnailData.message_id = messageId;
-                }
-                // Move the thumbnail data to the target node using the Discord ID and thumbnailKey
-                thumbnailsRef.child(discordId).child(targetNode).child(thumbnailKey).set(thumbnailData, error => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        // Remove the thumbnail from the 'pending' node using the Discord ID and thumbnailKey
-                        thumbnailsRef.child(discordId).child('pending').child(thumbnailKey).remove(error => {
-                            if (error) {
-                                reject(error);
-                            } else {
-                                resolve();
-                            }
-                        });
-                    }
-                });
-            } else {
-                reject(new Error('Thumbnail not found.'));
-            }
-        }, error => {
-            reject(error);
-        });
-    });
-}
-
-function fetchPendingThumbnailsForDiscordId(discordId) {
-    return new Promise((resolve, reject) => {
-        thumbnailsRef.child(discordId).child('pending').once('value', snapshot => {
-            if (snapshot.exists()) {
-                const thumbnailInfo = [];
-                snapshot.forEach(childSnapshot => {
-                    const key = childSnapshot.key;
-                    const data = childSnapshot.val();
-                    thumbnailInfo.push({
-                        key: key,
-                        url: data.thumbnail,
-                        discordId: discordId,  // Include the Discord ID
-                        messageId: data.Message_id  // Include the message_id
-                    });
-                });
-                resolve(thumbnailInfo);
-            } else {
-                resolve([]); // No thumbnails found in 'pending' for this Discord ID
-            }
-        }, error => {
-            reject(error);
-        });
-    });
-}
-
-
-// Modify the fetchAssociatedThumbnails function to return the thumbnails
-function fetchAssociatedThumbnails(discordIds) {
-    return Promise.all(discordIds.map(fetchPendingThumbnailsForDiscordId))
-        .then(results => {
-            const allThumbnails = [].concat(...results);
-            console.log("All associated thumbnails from 'pending':", allThumbnails);
-            return allThumbnails; // Return the thumbnails
-        })
-        .catch(error => {
-            console.error("Error fetching thumbnails from 'pending':", error);
-        });
-}
-
+let currentThumbnailIndex = 0;
 
 const url = window.location.href;
 const match = url.match(/channel\/(UC[^?\/]+)/);
@@ -144,32 +13,76 @@ let channelId;
 if (match && match[1]) {
     channelId = match[1];
     console.log("Channel ID:", channelId);
-
-    const dbRef = firebase.database().ref('al_channel_associations');
-
-    if (channelId) {
-        dbRef.child(channelId).once('value', snapshot => {
-            if (snapshot.exists()) {
-                const discordIds = snapshot.val();
-                discordIdsArray = Object.values(discordIds);
-                console.log("Associated Discord IDs:", discordIdsArray);
-                
-                // Fetch thumbnails after fetching Discord IDs
-                fetchAssociatedThumbnails(discordIdsArray);
-            } else {
-                console.log("No Discord IDs found for this YouTube channel.");
-            }
-        });
-    }
-} else {
-    console.error("Could not extract channel ID from URL");
 }
 
+function fetchDiscordChannelsByYouTubeID(youtubeChannelID) {
+    return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchDiscordChannels&youtube_channel_id=${youtubeChannelID}`)
+        .then(response => response.json())
+        .then(discordChannelIDs => {
+           
+        })
+        .catch(error => {
+            console.error("Error fetching Discord channels by YouTube ID:", error);
+        });
+}
+function fetchThumbnailsByYouTubeID(youtubeChannelID) {
+    return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchThumbnailsByYouTubeID&youtube_channel_id=${youtubeChannelID}`)
+        .then(response => response.json())
+        .then(thumbnails => {
+            console.log(thumbnails);
+            // Handle the thumbnails here
+            return thumbnails;
+        })
+        .catch(error => {
+            console.error("Error fetching thumbnails by YouTube ID:", error);
+        });
+}
+/*
+if (match && match[1]) {
+    channelId = match[1];
+    fetchDiscordChannelsByYouTubeID(channelId).then(() => {
+        // After fetching Discord channels, fetch the associated thumbnails
+        fetchThumbnailsByYouTubeID(channelId);
+    });
+}
+*/
+function addReviewButton() {
+    const existingButton = document.querySelector('ytcp-home-button');
+    if (existingButton && !document.querySelector('.reviewButton')) {
+        const reviewBtn = document.createElement('button');
+        reviewBtn.innerText = 'Review';
+        reviewBtn.className = 'reviewButton';
+        reviewBtn.style.backgroundColor = 'red';
+        reviewBtn.style.color = 'white';        // Modify the button size, round the edges, move it down, and remove the border
+        reviewBtn.style.height = '25px';           // Set the height. Adjust as needed.
+        reviewBtn.style.padding = '0 5px';         // Reduce padding to make button smaller overall. Adjust as needed.
+        reviewBtn.style.borderRadius = '5px';      // Rounded edges. Adjust for more or less rounding.
+        reviewBtn.style.marginTop = '7px';         // Move the button down slightly. Adjust as needed.
+        reviewBtn.style.border = 'none';  
 
-let reviewBoxVisible = false;
-let fullscreenClosed = false;  // New flag
+        reviewBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (reviewBoxVisible) {
+                const existingReviewBox = document.querySelector('.reviewBoxClass');
+                if (existingReviewBox) existingReviewBox.remove();
+                reviewBoxVisible = false;
+            } else {
+                // Fetch thumbnails from the PHP endpoint
+                fetchThumbnailsByYouTubeID(channelId).then(thumbnails => {
+                    const reviewBox = createReviewBox(thumbnails);
+                    document.body.appendChild(reviewBox);
+                    reviewBoxVisible = true;
+                }).catch(error => {
+                    console.error("Error fetching thumbnails:", error);
+                });
+            }
+        });
 
-function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnailInfo'
+        existingButton.insertAdjacentElement('afterend', reviewBtn);
+    }
+}
+
+function createReviewBox(thumbnails) {
     const reviewBox = document.createElement('div');
     reviewBox.className = 'reviewBoxClass';
     reviewBox.id = 'adloxsReviewBox';
@@ -184,7 +97,7 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
     reviewBox.style.overflowY = 'auto';
 
     const baseHeightPerThumbnail = 80;  // Assume each thumbnail container needs about 150px. Adjust as needed.
-    const totalHeight = thumbnailInfo.length * baseHeightPerThumbnail;  // Use thumbnailInfo.length
+    const totalHeight = thumbnails.length * baseHeightPerThumbnail; // Use thumbnailInfo.length
     const maxHeight = window.innerHeight * 0.8;  // Let's set a max height to 80% of the viewport height
 
     reviewBox.style.height = Math.min(totalHeight, maxHeight) + 'px';  // Set the height based on thumbnail count but don't exceed maxHeight
@@ -193,36 +106,33 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
         reviewBox.style.overflowY = 'auto';  // If the content exceeds the max height, make it scrollable
     }
 
-    thumbnailInfo.forEach((info) => {
+    thumbnails.forEach((thumbnail, index) => {
         const container = document.createElement('div');
         container.style.display = 'flex';
         container.style.alignItems = 'center';
         container.style.marginBottom = '10px';
-        container.style.borderBottom = '1px solid lightgrey';
+        if (index !== thumbnails.length - 1) {
+            container.style.borderBottom = '1px solid lightgrey';
+        }
         container.style.paddingBottom = '10px';
 
         const img = document.createElement('img');
-        img.src = info.url;  // Use info.url
+        img.src = thumbnail.thumbnail_url;  // Assuming the thumbnail object has a 'url' property
+        img.setAttribute('data-id', thumbnail.id);
         img.style.display = 'block';
         img.width = 120;
         img.style.marginRight = '15px';
         img.style.borderRadius = '5px';
         img.style.cursor = 'pointer';
         img.className = 'thumbnail-image';
-        img.setAttribute('data-src', info.url);
-        img.setAttribute('data-discord-id', info.discordId);
-        img.setAttribute('data-thumbnail-key', info.key);  // Store the thumbnail key
-        img.setAttribute('data-message-id', info.messageId); // Set the message ID
-        img.setAttribute('data-channel-id', info.channelId); // Set the channel ID
-
-        console.log("Thumbnail key for image:", img.getAttribute('data-thumbnail-key'));
-
+        img.setAttribute('data-src', thumbnail.thumbnail_url);
         img.onclick = function () {
-            viewImageFullscreen(info.url);  // Use info.url
+            viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);  // Ensure you're using the correct property from the thumbnail object
         };
 
-        const desc = document.createElement('div');
-        desc.innerText = info.comment || "No Title Available";  // This is where you can define what is displayed in description next to image
+
+         const desc = document.createElement('div');
+        desc.innerText = thumbnail.video_title || "No Title Available"; // This is where you can define what is displayed in description next to image
         desc.style.flexGrow = '1';
         desc.style.fontFamily = "YouTube Sans, sans-serif";
         desc.style.fontSize = '15px';
@@ -236,105 +146,44 @@ function createReviewBox(thumbnailInfo) {  // Renamed 'thumbnails' to 'thumbnail
     return reviewBox;
 }
 
-
-
-
-function addReviewButton() {
-    const existingButton = document.querySelector('ytcp-home-button');
-    if (existingButton && !document.querySelector('.reviewButton')) {
-        const reviewBtn = document.createElement('button');
-        reviewBtn.innerText = 'Review';
-        reviewBtn.className = 'reviewButton';
-        reviewBtn.style.backgroundColor = 'red';  
-        reviewBtn.style.color = 'white'; 
-
-        // Modify the button size, round the edges, move it down, and remove the border
-        reviewBtn.style.height = '25px';           // Set the height. Adjust as needed.
-        reviewBtn.style.padding = '0 5px';         // Reduce padding to make button smaller overall. Adjust as needed.
-        reviewBtn.style.borderRadius = '5px';      // Rounded edges. Adjust for more or less rounding.
-        reviewBtn.style.marginTop = '7px';         // Move the button down slightly. Adjust as needed.
-        reviewBtn.style.border = 'none';  
-
-        reviewBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (reviewBoxVisible) {
-                const existingReviewBox = document.querySelector('.reviewBoxClass');
-                if (existingReviewBox) existingReviewBox.remove();
-                reviewBoxVisible = false;
-            } else {
-                // Fetch thumbnails from Firebase
-                fetchAssociatedThumbnails(discordIdsArray).then(thumbnails => {
-                    const reviewBox = createReviewBox(thumbnails);
-              
-                thumbnails.forEach((thumbnail, index) => {
-        const container = document.createElement('div');
-        container.style.display = 'flex';
-        container.style.alignItems = 'center';
-        container.style.marginBottom = '10px';
-        if (index !== thumbnails.length - 1) { 
-            container.style.borderBottom = '1px solid lightgrey';
+function cycleToNextThumbnail(img, thumbnails) {
+    if (thumbnails[currentThumbnailIndex + 1]) {
+        currentThumbnailIndex++;
+        img.src = thumbnails[currentThumbnailIndex].thumbnail_url;
+        return thumbnails[currentThumbnailIndex].thumbnail_url;  // Return the new imageUrl
+    } else {
+        const fullscreenDiv = document.getElementById('fullscreenDiv');
+        if (fullscreenDiv) {
+            document.body.removeChild(fullscreenDiv);
         }
-        container.style.paddingBottom = '10px';
-
-        const img = document.createElement('img');
-        img.src = thumbnail;
-        img.style.display = 'block';
-        img.width = 120;
-        img.style.marginRight = '15px';
-        img.style.borderRadius = '5px';
-        img.style.cursor = 'pointer';
-        img.className = 'thumbnail-image';  // New: Add a class for the thumbnail
-        img.setAttribute('data-src', thumbnail);  // New: Set a data attribute for referencing
-        img.onclick = function() {
-            viewImageFullscreen(thumbnail);
-        };
-
-        const desc = document.createElement('div');
-        desc.innerText = thumbnail.description;
-        desc.style.flexGrow = '1';
-        desc.style.fontSize = '14px';  // Updated font size
-        desc.className = 'description';      
-    });
-
-
-                document.body.appendChild(reviewBox);
-                    reviewBoxVisible = true;
-
-                }).catch(error => {
-                    console.error("Error fetching thumbnails:", error);
-                });
-            }
-        });
-
-        existingButton.insertAdjacentElement('afterend', reviewBtn);
+        return null;
     }
 }
 
-// ... The rest of your content.js, no change ...
 
 
-function viewImageFullscreen(imageUrl) {
+function viewImageFullscreen(imageUrl, index, thumbnails) {
     const fullscreenDiv = document.createElement('div');
     fullscreenDiv.style.position = 'fixed';
     fullscreenDiv.style.top = '0';
     fullscreenDiv.style.left = '0';
     fullscreenDiv.style.width = '100vw';
     fullscreenDiv.style.height = '100vh';
-    fullscreenDiv.style.backgroundColor = 'rgba(0,0,0,0.9)';
+    fullscreenDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
     fullscreenDiv.style.zIndex = '2000';
     fullscreenDiv.style.display = 'flex';
     fullscreenDiv.style.justifyContent = 'center';
     fullscreenDiv.style.alignItems = 'center';
     fullscreenDiv.id = 'fullscreenDiv';
 
-    const largeImage = document.createElement('img');
-    largeImage.src = imageUrl;
-    largeImage.style.maxWidth = '90%';
-    largeImage.style.maxHeight = '90%';
-    largeImage.style.borderRadius = '10px';
-    largeImage.style.marginRight = '20px';  // Create space between the image and the buttons
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.src = thumbnails[index].thumbnail_url;
+    img.style.maxWidth = '90%';
+    img.style.maxHeight = '90%';
+    img.style.borderRadius = '20px';
+    img.style.marginRight = '20px';
 
-    // Create the approve button
     const approveBtn = document.createElement('button');
     approveBtn.innerText = '✔';
     approveBtn.style.backgroundColor = 'green';
@@ -347,26 +196,24 @@ function viewImageFullscreen(imageUrl) {
     approveBtn.onclick = function (event) {
         event.stopPropagation();
         console.log(imageUrl + ' approved');
-        document.body.removeChild(fullscreenDiv);
+        
 
+        // Find the associated thumbnail element in the review box
         const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
-        const thumbnailKey = associatedThumbnailElement.getAttribute('data-thumbnail-key');  // Retrieve the thumbnail key
-        const discordId = associatedThumbnailElement.getAttribute('data-discord-id');  // Retrieve the Discord ID
-        const messageId = associatedThumbnailElement.getAttribute('data-message-id'); // Get the message ID
-        const channelId = associatedThumbnailElement.getAttribute('data-channel-id'); // Get the channel ID
-
-        moveThumbnailToNode(discordId, thumbnailKey, 'approved')
-            .then(() => {
-                console.log('Thumbnail moved to approved.');
-                // Update the Discord message for approval
-                updateDiscordMessage(channelId, messageId, 'Approved', 5308165, '✅');
-            })
-            .catch(error => {
-                console.error('Error moving thumbnail:', error);
-            });
-    };
-
-    // Create the revise button
+ 
+        // Add the 'approved' class to the container of the associated thumbnail
+        associatedThumbnailElement.closest('div').classList.add('approved');
+    
+        // Update the thumbnail status in the database
+        const thumbnailId = associatedThumbnailElement.getAttribute('data-id'); // Assuming you have a data-id attribute on the thumbnail element
+        updateThumbnailStatus(thumbnailId, 'approved');
+    
+        const newImageUrl = cycleToNextThumbnail(img, thumbnails);
+        if (newImageUrl) {
+        imageUrl = newImageUrl;
+    }
+};
+        
     const reviseBtn = document.createElement('button');
     reviseBtn.innerText = '✖';
     reviseBtn.style.backgroundColor = 'red';
@@ -376,55 +223,91 @@ function viewImageFullscreen(imageUrl) {
     reviseBtn.style.borderRadius = '4px';  // Round the button corners
     reviseBtn.style.fontSize = '20px';  // Increase the font size for visibility
     reviseBtn.onclick = function (event) {
-        event.stopPropagation();
-        const comment = prompt('Enter your revision request:', '');
-        if (comment) {
-            console.log('Revision for ' + imageUrl + ':', comment);
-            document.body.removeChild(fullscreenDiv);
+    event.stopPropagation();
+    const comment = prompt('Enter your revision request:', '');
+      if (comment) {
+        console.log('Revision for ' + imageUrl + ':', comment);
+            
+          const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
 
-            const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
-            const thumbnailKey = associatedThumbnailElement.getAttribute('data-thumbnail-key');  // Retrieve the thumbnail key
-            const discordId = associatedThumbnailElement.getAttribute('data-discord-id');  // Retrieve the Discord ID
-            const messageId = associatedThumbnailElement.getAttribute('data-message-id'); // Get the message ID
-
-            moveThumbnailToNode(discordId, thumbnailKey, 'revise', comment)
-                .then(() => {
-                    console.log('Thumbnail moved to revise with comment.');
-                    updateDiscordMessage(channelId, messageId, `Revised: ${comment}`, 13063773, '❌');
-                })
-                .catch(error => {
-                    console.error('Error moving thumbnail:', error);
-                });
+          associatedThumbnailElement.closest('div').classList.add('revised');
+        
+          const thumbnailId = associatedThumbnailElement.getAttribute('data-id'); // Assuming you have a data-id attribute on the thumbnail element
+          updateThumbnailStatus(thumbnailId, 'revised', comment);
+ 
+          const newImageUrl = cycleToNextThumbnail(img, thumbnails);
+          if (newImageUrl) {
+            imageUrl = newImageUrl;
         }
-    };
+    }
+};
 
+       const buttonContainer = document.createElement('div');
+       buttonContainer.style.display = 'flex';
+       buttonContainer.style.flexDirection = 'column';
+       buttonContainer.style.alignItems = 'flex-end';  // Align buttons to the right
+       buttonContainer.style.marginRight = '10px';  // Add some space on the right
 
+       buttonContainer.appendChild(approveBtn);
+       buttonContainer.appendChild(reviseBtn);
 
-    // Container for the buttons
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.flexDirection = 'column';
-    buttonContainer.style.alignItems = 'flex-end';  // Align buttons to the right
-    buttonContainer.style.marginRight = '10px';  // Add some space on the right
+       fullscreenDiv.appendChild(img);
+       fullscreenDiv.appendChild(buttonContainer);
+       document.body.appendChild(fullscreenDiv);
 
-    buttonContainer.appendChild(approveBtn);
-    buttonContainer.appendChild(reviseBtn);
-
-    fullscreenDiv.appendChild(largeImage);
-    fullscreenDiv.appendChild(buttonContainer);  // Append the buttons to the fullscreenDiv
-
-    document.body.appendChild(fullscreenDiv);
-
-    fullscreenDiv.onclick = function(event) {
-        event.stopPropagation();
-        document.body.removeChild(fullscreenDiv);
-        fullscreenClosed = true; 
-
-        setTimeout(() => {
-            fullscreenClosed = false;
-        }, 10);
-    };
+       fullscreenDiv.addEventListener('click', function (event) {
+       event.stopPropagation();  // Stop the event from propagating to the document
+       fullscreenDiv.remove();
+    });
 }
+
+function updateThumbnailStatus(thumbnailId, status, revisionComment = null) {
+    const formData = new URLSearchParams();
+    formData.append('thumbnail_id', thumbnailId);
+    formData.append('status', status);
+    if (revisionComment) {
+        formData.append('revision_comment', revisionComment);
+    }
+
+    // First, update the database
+    fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=updateThumbnailStatus', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data.message);
+
+        // After updating the database, update the Discord message
+        const associatedThumbnailElement = document.querySelector(`[data-id="${thumbnailId}"]`);
+        const channelId = associatedThumbnailElement.getAttribute('data-channel-id');
+        const messageId = associatedThumbnailElement.getAttribute('data-message-id');
+        const imageUrl = associatedThumbnailElement.getAttribute('data-src');
+
+        const discordFormData = new URLSearchParams();
+        discordFormData.append('channelId', channelId);
+        discordFormData.append('messageId', messageId);
+        discordFormData.append('imageUrl', imageUrl);
+        discordFormData.append('status', status);
+        if (revisionComment) {
+            discordFormData.append('revisionComment', revisionComment);
+        }
+
+        return fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/discord-update.php', {
+            method: 'POST',
+            body: discordFormData
+        });
+
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data.message);
+    })
+    .catch(error => {
+        console.error("Error:", error);
+    });
+}
+
 
 function injectStyles() {
     console.log("Injecting styles...");
@@ -446,6 +329,18 @@ function injectStyles() {
         .revised .thumbnail-image {
             filter: brightness(70%) sepia(1) hue-rotate(0deg); /* red filter */
         }
+         #fullscreenDiv img.slide-in {
+        animation: slideIn 0.5s forwards;
+        }
+
+        @keyframes slideIn {
+        from {
+            transform: translateX(-100%);
+        }
+        to {
+            transform: translateX(0);
+        }
+    }
     `;
 
     const styleSheet = document.createElement("style");
@@ -470,10 +365,23 @@ document.addEventListener('click', function (event) {
         reviewBoxVisible = false;
     }
 });
+document.addEventListener('click', function (event) {
+    const reviewBox = document.getElementById('adloxsReviewBox');
+    const fullscreenDiv = document.getElementById('fullscreenDiv');
+
+    if (reviewBoxVisible && reviewBox &&
+        !reviewBox.contains(event.target) &&
+        !event.target.matches('.reviewButton') &&
+        (!fullscreenDiv || !fullscreenDiv.contains(event.target)) &&
+        !fullscreenClicked) {  // Check the flag here
+        reviewBox.remove();
+        reviewBoxVisible = false;
+    }
+    fullscreenClicked = false;
+});
 
 document.addEventListener('DOMContentLoaded', addReviewButton);
 
 const reviewButtonObserver = new MutationObserver(addReviewButton);
 reviewButtonObserver.observe(document.body, { childList: true, subtree: true });
 
-  
