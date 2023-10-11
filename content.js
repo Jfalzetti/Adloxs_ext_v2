@@ -3,7 +3,6 @@ console.log("content.js loaded");
 let fullscreenClosed = false;
 let reviewBoxVisible = false;
 let fullscreenClicked = false;
-let discordIdsArray = [];
 let currentThumbnailIndex = 0;
 
 const url = window.location.href;
@@ -25,6 +24,7 @@ function fetchDiscordChannelsByYouTubeID(youtubeChannelID) {
             console.error("Error fetching Discord channels by YouTube ID:", error);
         });
 }
+
 function fetchThumbnailsByYouTubeID(youtubeChannelID) {
     return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchThumbnailsByYouTubeID&youtube_channel_id=${youtubeChannelID}`)
         .then(response => response.json())
@@ -37,15 +37,7 @@ function fetchThumbnailsByYouTubeID(youtubeChannelID) {
             console.error("Error fetching thumbnails by YouTube ID:", error);
         });
 }
-/*
-if (match && match[1]) {
-    channelId = match[1];
-    fetchDiscordChannelsByYouTubeID(channelId).then(() => {
-        // After fetching Discord channels, fetch the associated thumbnails
-        fetchThumbnailsByYouTubeID(channelId);
-    });
-}
-*/
+
 function addReviewButton() {
     const existingButton = document.querySelector('ytcp-home-button');
     if (existingButton && !document.querySelector('.reviewButton')) {
@@ -117,8 +109,10 @@ function createReviewBox(thumbnails) {
         container.style.paddingBottom = '10px';
 
         const img = document.createElement('img');
-        img.src = thumbnail.thumbnail_url;  // Assuming the thumbnail object has a 'url' property
+        img.src = thumbnail.thumbnail_url;  
         img.setAttribute('data-id', thumbnail.id);
+        img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
+        img.setAttribute('discord_message_id', thumbnail.discord_message_id);
         img.style.display = 'block';
         img.width = 120;
         img.style.marginRight = '15px';
@@ -278,26 +272,37 @@ function updateThumbnailStatus(thumbnailId, status, revisionComment = null) {
     .then(data => {
         console.log(data.message);
 
-        // After updating the database, update the Discord message
+        // Retrieve associated thumbnail attributes
         const associatedThumbnailElement = document.querySelector(`[data-id="${thumbnailId}"]`);
-        const channelId = associatedThumbnailElement.getAttribute('data-channel-id');
-        const messageId = associatedThumbnailElement.getAttribute('data-message-id');
-        const imageUrl = associatedThumbnailElement.getAttribute('data-src');
-
-        const discordFormData = new URLSearchParams();
-        discordFormData.append('channelId', channelId);
-        discordFormData.append('messageId', messageId);
-        discordFormData.append('imageUrl', imageUrl);
-        discordFormData.append('status', status);
-        if (revisionComment) {
-            discordFormData.append('revisionComment', revisionComment);
+        if (!associatedThumbnailElement) {
+            console.error("Thumbnail element not found for thumbnailId:", thumbnailId);
+            return;
         }
 
-        return fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/discord-update.php', {
-            method: 'POST',
-            body: discordFormData
-        });
+        const channelId = associatedThumbnailElement.getAttribute('discord_channel_id');
+        const messageId = associatedThumbnailElement.getAttribute('discord_message_id');
+        const imageUrl = associatedThumbnailElement.getAttribute('data-src');
 
+        // Construct JSON data
+        const requestData = {
+            channelId: String(channelId),
+            messageId: String(messageId),
+            imageUrl: imageUrl,
+            status: status
+        };
+
+        if (status === 'revised' && revisionComment) {
+            requestData.revisionComment = revisionComment;
+        }
+        console.log("Sending data:", requestData);
+        // Send JSON request to Discord update PHP script
+        return fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/discordupdate.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
     })
     .then(response => response.json())
     .then(data => {
@@ -307,6 +312,7 @@ function updateThumbnailStatus(thumbnailId, status, revisionComment = null) {
         console.error("Error:", error);
     });
 }
+
 
 
 function injectStyles() {
