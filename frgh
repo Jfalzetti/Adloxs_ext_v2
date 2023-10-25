@@ -1,0 +1,1393 @@
+console.log("content.js loaded");
+
+let fullscreenClosed = false;
+let reviewBoxVisible = false;
+let fullscreenClicked = false;
+let isFullscreenActive = false;
+let videoFullscreenClicked = false;
+
+
+const url = window.location.href;
+const match = url.match(/channel\/(UC[^?\/]+)/);
+
+    let channelId;
+    let thumbnailsData = [];
+    let shortsData = [];
+    if (match && match[1]) {
+        channelId = match[1];
+        console.log("Channel ID:", channelId);
+}
+
+    Promise.all([
+        fetchThumbnailsByYouTubeID(channelId),
+        fetchShortsByYouTubeID(channelId)
+    ]).then(([thumbnails, shorts]) => {
+        thumbnailsData = thumbnails;
+        shortsData = shorts;
+        addReviewButton();
+    }).catch(error => {
+        console.error("Error fetching data:", error);
+    });
+
+function fetchDiscordChannelsByYouTubeID(youtubeChannelID) {
+    return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchDiscordChannels&youtube_channel_id=${youtubeChannelID}`)
+        .then(response => response.json())
+        .then(discordChannelIDs => {
+           
+        })
+        .catch(error => {
+            console.error("Error fetching Discord channels by YouTube ID:", error);
+        });
+}
+
+function fetchThumbnailsByYouTubeID(youtubeChannelID) {
+    return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchThumbnailsByYouTubeID&youtube_channel_id=${youtubeChannelID}`)
+        .then(response => response.json())
+        .then(thumbnails => {
+            console.log(thumbnails);
+            // Handle the thumbnails here
+            return thumbnails;
+        })
+        .catch(error => {
+            console.error("Error fetching thumbnails by YouTube ID:", error);
+        });
+}
+
+function fetchShortsByYouTubeID(youtubeChannelID) {
+    return fetch(`https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=fetchShortsByYouTubeID&youtube_channel_id=${youtubeChannelID}`)
+        .then(response => response.json())
+        .then(shorts => {
+            console.log(shorts);
+            
+            return shorts;
+        })
+        .catch(error => {
+            console.error("Error fetching s by YouTube ID:", error);
+        });
+}
+
+const formHTML = `
+<div id="customFormModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display: none; align-items: center; justify-content: center; font-family: sans-serif;">
+    <div style="width:50%; height 60%; padding:20px; background:#fff; border-radius:5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 18px; font-weight: bold; margin-top: -5px; margin-bottom: 0px;">New Upload Request</h2>
+            <button id="closeModalButton" style="background: none; border: none; cursor: pointer; margin-top: -5px; margin-bottom: 0px;">
+                <img src="https://cdn.icon-icons.com/icons2/2714/PNG/512/x_thin_icon_171414.png" alt="Close" style="width: 24px; height: 24px;">
+            </button>
+        </div>
+        <hr style="border: 0; height: 0.2px; background: #e5e5e5; margin: 10px -20px;">
+        <form id="customForm" style="flex-grow: 1;">
+            <input type="text" name="title" placeholder="Title" style="border: 1px solid lightgrey; padding: 10px; border-radius: 5px; margin-bottom: 20px; width: 97%;">
+            
+            <div style="border: 1px solid lightgrey; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 10px;">Schedule</h3>
+                <label>
+                  
+                    <input type="date" id="uploadDate" name="uploadDate">
+                </label>
+                <label>
+                   
+                    <input type="time" id="uploadTime" name="uploadTime">
+                </label>
+                <br><br>
+                    <label style="font-size: 12px; font-weight: bold;">
+                        No Date:
+                        <input type="checkbox" id="noDateCheckbox" name="noDate">
+                    </label>
+                    <label style="font-size: 12px; font-weight: bold;">
+                        A/B:
+                        <input type="checkbox" id="abTestingCheckbox" name="abTesting">
+                    </label>
+            </div>
+            
+            <label>
+               
+                <textarea name="notesLinks" placeholder="Notes/Links (Any brand assets or videos are linked here via google drive)" style="border: 1px solid lightgrey; padding: 10px; border-radius: 5px; margin-bottom: 10px; width: 97%;"></textarea>
+            </label>
+            <div style="border-top: 0.2px solid #e5e5e5; padding-top: 10px;  margin: 0px -20px; display: flex; justify-content: flex-end;">
+            <button type="submit" style="background-color: #065fd4; color: #fff; border: none; padding: 10px 20px; border-radius: 2px; cursor: pointer; margin-right: 10px; margin-bottom: -10px;">Submit</button>
+        </div>
+        </form>
+       </div>
+</div>
+`;
+document.body.insertAdjacentHTML('afterend', formHTML);
+
+// Add event listener to the close button
+document.getElementById('closeModalButton').addEventListener('click', function () {
+    document.getElementById('customFormModal').style.display = 'none';
+});
+document.getElementById('noDateCheckbox').addEventListener('change', function () {
+    const dateInput = document.getElementById('uploadDate');
+    const timeInput = document.getElementById('uploadTime');
+    if (this.checked) {
+        dateInput.style.display = 'none';
+        timeInput.style.display = 'none';
+    } else {
+        dateInput.style.display = 'inline-block';
+        timeInput.style.display = 'inline-block';
+    }
+});
+document.addEventListener('click', function (event) {
+    if (event.target.matches('div.label.style-scope.ytcp-button')) {
+        console.log('Create button has been clicked!');
+
+        // Select the #paper-list
+        let paperList = document.querySelector('#paper-list');
+
+        // Check if the button already exists in the list
+        let existingButton = document.querySelector('#uniqueButtonId');
+        if (existingButton) {
+            console.log('Button already added to the list');
+            return; // Exit the function if the button already exists
+        }
+
+        // Manually create the button structure
+        let newButton = document.createElement('tp-yt-paper-item');
+        newButton.className = 'tp-yt-paper-item selectable-item style-scope ytcp-text-menu';
+        newButton.id = 'uniqueButtonId';
+
+        let ytcpVe = document.createElement('ytcp-ve');
+        ytcpVe.className = 'style-scope ytcp-text-menu';
+
+        // Create an image icon and set its source to your image URL
+        let iconImage = document.createElement('img');
+        iconImage.src = 'https://i.imgur.com/xvMMsb4.png'; // Replace with your image URL
+        iconImage.alt = 'Icon'; // Add an alt text for accessibility
+        iconImage.className = 'style-scope ytcp-text-menu'; // Optional: Add any required classes
+        iconImage.style.width = '24px';
+        iconImage.style.height = '24px';
+
+        // Append the image icon to the ytcpVe element or any other desired location
+        ytcpVe.appendChild(iconImage);
+
+        // Set the button text
+        let buttonText = document.createElement('span');
+        buttonText.textContent = 'New Upload';
+        buttonText.style.paddingLeft = '16px'; // Add padding to the left side of the text
+        ytcpVe.appendChild(buttonText);
+
+        newButton.appendChild(ytcpVe);
+        paperList.appendChild(newButton);
+
+        // Add event listener to the new button
+        newButton.addEventListener('click', function () {
+            let formModal = document.getElementById('customFormModal');
+            if (formModal) {
+                formModal.style.display = 'flex';
+            } else {
+                console.error('Form modal not found');
+            }
+        });
+    }
+});
+
+function gatherData2() {
+    // Gather data from the new form
+    const title = document.querySelector('#customForm input[name="title"]').value;
+
+    let date = document.querySelector('#customForm input[name="uploadDate"]').value;
+    let hour = document.querySelector('#customForm input[name="uploadTime"]').value;
+
+    const noDateChecked = document.querySelector('#customForm input[name="noDate"]').checked;
+    if (noDateChecked) {
+        date = "no date";
+        hour = "no time";
+    }
+
+    const notesLinks = document.querySelector('#customForm textarea[name="notesLinks"]').value;
+    const isABTestingChecked = document.querySelector('#customForm input[name="abTesting"]').checked;
+
+    // Log the gathered data
+    console.log("Gathered Data:");
+    console.log("Title:", title);
+    console.log("Date:", date);
+    console.log("Hour:", hour);
+    console.log("Notes/Links:", notesLinks);
+    console.log("Is A/B Testing:", isABTestingChecked);
+
+    sendDataToServer2(date, hour, title, notesLinks, isABTestingChecked);
+}
+
+function sendDataToServer2(date, hour, title, notesLinks, isABTestingChecked) {
+
+    const url = "https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=newuploadrequest2";
+
+    const volume = isABTestingChecked ? 2 : 1;
+
+    const requestBody = `channel_id=${channelId}&due_date=${date}&due_time=${hour}&video_title=${title}&notes=${notesLinks}&volume=${volume}`;
+
+    // Log the request body
+    console.log("Sending data:", requestBody);
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: requestBody
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+
+            // Close the modal after successfully sending the data
+            document.getElementById('customFormModal').style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// Add event listener to the form's submit event
+document.getElementById('customForm').addEventListener('submit', function (event) {
+    event.preventDefault(); // Prevent the form from actually submitting
+    gatherData2();
+});
+
+
+function addReviewButton() {
+    const existingButton = document.querySelector('ytcp-home-button');
+    if (existingButton && !document.querySelector('.reviewButton')) {
+        const reviewBtn = document.createElement('button');
+        reviewBtn.innerText = 'Adloxs';
+        reviewBtn.className = 'reviewButton';
+        reviewBtn.style.backgroundColor = 'red';
+        reviewBtn.style.color = 'white';
+        reviewBtn.style.height = '25px';
+        reviewBtn.style.padding = '0 5px';
+        reviewBtn.style.borderRadius = '5px';
+        reviewBtn.style.marginTop = '7px';
+        reviewBtn.style.border = 'none';
+        reviewBtn.style.cursor = 'pointer'; // Makes the cursor a hand when hovering over the button
+        reviewBtn.style.transition = 'all 0.2s'; // Smooth transition for the drop effect
+
+        reviewBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (reviewBoxVisible) {
+                const existingReviewBox = document.querySelector('.reviewBoxClass');
+                if (existingReviewBox) existingReviewBox.remove();
+                reviewBoxVisible = false;
+                reviewBtn.style.boxShadow = 'none';
+                reviewBtn.style.transform = 'none';
+            } else {
+                // Use the stored thumbnailsData and shortsData instead of fetching again
+                const reviewBox = createReviewBox(thumbnailsData, shortsData);
+                document.body.appendChild(reviewBox);
+                reviewBoxVisible = true;
+            }
+               
+        });
+
+        existingButton.insertAdjacentElement('afterend', reviewBtn);
+        document.title = "Adloxs";
+
+    }
+}
+function createThumbnailsReviewBox(thumbnails) {
+    const reviewBox = document.createElement('div');
+    reviewBox.className = 'thumbnailsReviewBoxClass';
+    reviewBox.id = 'thumbnailsReviewBox';
+    reviewBox.style.width = '25vw';
+    reviewBox.style.border = '1px solid #e0e0e0';
+    reviewBox.style.padding = '1rem';
+    reviewBox.style.position = 'fixed';
+    reviewBox.style.top = '7rem';
+    reviewBox.style.left = '20.5%';
+    reviewBox.style.backgroundColor = '#fff';
+    reviewBox.style.zIndex = '1000';
+    reviewBox.style.overflowY = 'auto';
+    reviewBox.style.borderRadius = '5px';
+    reviewBox.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+    reviewBox.style.scrollbarWidth = 'none';
+
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        #thumbnailsReviewBox::-webkit-scrollbar {
+            display: none;
+        }
+    `;
+    document.head.appendChild(styleElement);
+
+    // Populate the Thumbnails content
+    thumbnails.forEach((thumbnail, index) => {
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.marginBottom = '10px';
+        if (index !== thumbnails.length - 1) {
+            container.style.borderBottom = '1px solid lightgrey';
+        }
+        container.style.paddingBottom = '10px';
+
+        const img = document.createElement('img');
+        img.src = thumbnail.thumbnail_url;
+        img.setAttribute('data-id', thumbnail.id);
+        img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
+        img.setAttribute('discord_thread_id', thumbnail.discord_thread_id);
+        img.setAttribute('discord_message_id', thumbnail.discord_message_id);
+        img.style.display = 'block';
+        img.width = 120;
+        img.style.marginRight = '15px';
+        img.style.borderRadius = '2px';
+        img.style.cursor = 'pointer';
+        img.className = 'thumbnail-image';
+        img.setAttribute('data-src', thumbnail.thumbnail_url);
+        img.onclick = function () {
+            viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);
+        };
+
+        const desc = document.createElement('div');
+        desc.innerText = thumbnail.video_title || "No Title Available";
+        desc.style.flexGrow = '1';
+        desc.style.fontFamily = "YouTube Sans, sans-serif";
+        desc.style.fontSize = '15px';
+        desc.className = 'description';
+
+        container.appendChild(img);
+        container.appendChild(desc);
+        reviewBox.appendChild(container);
+    });
+
+    return reviewBox;
+}
+
+function activateTab(tabElement) {
+    // Deactivate any currently active tabs
+    const activeTabs = document.querySelectorAll('.ytcp-content-section.iron-selected');
+    activeTabs.forEach(tab => {
+        tab.classList.remove('iron-selected');
+        tab.setAttribute('aria-selected', 'false');
+    });
+
+    // Activate the clicked tab
+    tabElement.classList.add('iron-selected');
+    tabElement.setAttribute('aria-selected', 'true');
+
+    // Move the blue marker to the clicked tab
+    const selectionBar = document.getElementById('selectionBar');
+    if (selectionBar) {
+        const tabPosition = tabElement.getBoundingClientRect().left;
+        const tabsContainerPosition = document.getElementById('tabsContainer').getBoundingClientRect().left;
+        const newPosition = tabPosition - tabsContainerPosition;
+        selectionBar.style.left = `${newPosition}px`;
+        selectionBar.style.width = `${tabElement.getBoundingClientRect().width}px`;
+    }
+
+    // Check if the clicked tab is the Thumbnails tab
+    if (tabElement.id === 'thumbnails-tab') {
+        // Fetch or generate your thumbnails data here
+        const thumbnailsData = []; // Replace this with actual data fetching or generation
+
+        // Create the thumbnails review box
+        const thumbnailsReviewBox = createThumbnailsReviewBox(thumbnailsData);
+
+        // Append the review box to the desired location on the page
+        // For this example, I'm appending it to the body, but you can choose a more specific location
+        const existingReviewBox = document.getElementById('thumbnailsReviewBox');
+        if (existingReviewBox) {
+            existingReviewBox.replaceWith(thumbnailsReviewBox);
+        } else {
+            document.body.appendChild(thumbnailsReviewBox);
+        }
+    }
+}
+
+function addThumbnailsTab() {
+    const tabsContainer = document.getElementById('tabsContent');
+    if (tabsContainer && !document.getElementById('thumbnails-tab')) {
+        // Create a new tab for Thumbnails
+        const thumbnailsTabElement = document.createElement('tp-yt-paper-tab');
+        thumbnailsTabElement.id = 'thumbnails-tab';
+        thumbnailsTabElement.slot = 'tabs';
+        thumbnailsTabElement.className = 'style-scope ytcp-content-section';
+        thumbnailsTabElement.setAttribute('role', 'tab');
+        thumbnailsTabElement.setAttribute('style-target', 'host');
+        thumbnailsTabElement.setAttribute('aria-disabled', 'false');
+        thumbnailsTabElement.setAttribute('aria-selected', 'false');
+
+        const tabContentDiv = document.createElement('div');
+        tabContentDiv.className = 'tab-content style-scope tp-yt-paper-tab';
+        tabContentDiv.setAttribute('style-target', 'tab-content');
+
+        const tabSpan = document.createElement('span');
+        tabSpan.className = 'style-scope ytcp-content-section';
+        tabSpan.innerText = 'Thumbnails';
+
+        tabContentDiv.appendChild(tabSpan);
+        thumbnailsTabElement.appendChild(tabContentDiv);
+
+        // Add click event listener to the Thumbnails tab
+        thumbnailsTabElement.addEventListener('click', () => {
+            activateTab(thumbnailsTabElement);
+            // TODO: Load the content associated with the Thumbnails tab
+        });
+
+        // Append the new Thumbnails tab to the tabsContainer
+        tabsContainer.appendChild(thumbnailsTabElement);
+
+        // Create content container for Thumbnails
+        const thumbnailsContent = document.createElement('div');
+        thumbnailsContent.id = 'thumbnails-content';
+
+
+        // Populate the Thumbnails content
+        thumbnails.forEach((thumbnail, index) => {
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.marginBottom = '10px';
+            if (index !== thumbnails.length - 1) {
+                container.style.borderBottom = '1px solid lightgrey';
+            }
+            container.style.paddingBottom = '10px';
+
+            const img = document.createElement('img');
+            img.src = thumbnail.thumbnail_url;
+            img.setAttribute('data-id', thumbnail.id);
+            img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
+            img.setAttribute('discord_thread_id', thumbnail.discord_thread_id);
+            img.setAttribute('discord_message_id', thumbnail.discord_message_id);
+            img.style.display = 'block';
+            img.width = 120;
+            img.style.marginRight = '15px';
+            img.style.borderRadius = '2px';
+            img.style.cursor = 'pointer';
+            img.className = 'thumbnail-image';
+            img.setAttribute('data-src', thumbnail.thumbnail_url);
+            img.onclick = function () {
+                viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);
+            };
+
+            const desc = document.createElement('div');
+            desc.innerText = thumbnail.video_title || "No Title Available";
+            desc.style.flexGrow = '1';
+            desc.style.fontFamily = "YouTube Sans, sans-serif";
+            desc.style.fontSize = '15px';
+            desc.className = 'description';
+
+            container.appendChild(img);
+            container.appendChild(desc);
+            thumbnailsContent.appendChild(container);
+        });
+
+        // Append the content section to the main content container
+        const mainContentContainer = document.querySelector('.main-content-container-selector'); // Replace with the appropriate selector for the main content container
+        mainContentContainer.appendChild(thumbnailsContent);
+
+        return true;  // Return true if the tab was added
+    }
+    return false;  // Return false if the tab wasn't added
+}
+
+function checkAndAddTab() {
+    if (!addThumbnailsTab()) {
+        setTimeout(checkAndAddTab, 2000);  // If tab wasn't added, check again in 2 seconds
+    }
+}
+
+checkAndAddTab();
+
+const tabsObserver = new MutationObserver((mutationsList) => {
+    for (let mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+            addThumbnailsTab();
+        }
+    }
+});
+
+tabsObserver.observe(document.body, { childList: true, subtree: true });
+
+
+function createReviewBox(thumbnails, shorts) {
+    const reviewBox = document.createElement('div');
+    reviewBox.className = 'reviewBoxClass';
+    reviewBox.id = 'adloxsReviewBox';
+    reviewBox.style.width = '25vw';  // Use viewport width for adaptiveness
+    reviewBox.style.border = '1px solid #e0e0e0';
+    reviewBox.style.padding = '1rem';  // Use rem for padding
+    reviewBox.style.position = 'fixed';
+    reviewBox.style.top = '7rem';  // Use rem for top positioning
+    reviewBox.style.left = '20.5%';  // This might need to be adjusted dynamically if the sidebar's position changes
+    reviewBox.style.backgroundColor = '#fff';
+    reviewBox.style.zIndex = '1000';
+    reviewBox.style.overflowY = 'auto';
+    reviewBox.style.borderRadius = '5px';
+    reviewBox.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+    reviewBox.style.scrollbarWidth = 'none';
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        #adloxsReviewBox::-webkit-scrollbar {
+            display: none;
+        }
+    `;
+    document.head.appendChild(styleElement);
+
+    const baseHeightPerThumbnail = 100;  // Assume each thumbnail container needs about 150px. Adjust as needed.
+    const baseHeightPerShort = 40;  // Assume each short container needs about 40px. Adjust as needed.
+    const minHeight = 120;  // Minimum height to ensure tabs are visible. Adjust as needed.
+    const totalHeight = Math.max(minHeight, thumbnails.length * baseHeightPerThumbnail + shorts.length * baseHeightPerShort); // Calculate total height based on both thumbnails and shorts
+    const maxHeight = window.innerHeight * 0.8;  // Let's set a max height to 80% of the viewport height
+
+    reviewBox.style.height = Math.min(totalHeight, maxHeight) + 'px';  // Set the height based on content count but don't exceed maxHeight
+
+    if (totalHeight > maxHeight) {
+        reviewBox.style.overflowY = 'auto';  // If the content exceeds the max height, make it scrollable
+    }
+    const sidebar = document.querySelector('.style-scope ytcp-navigation-drawer');  // Replace '.sidebar-selector' with the actual selector for the sidebar
+    if (sidebar) {
+        const sidebarRect = sidebar.getBoundingClientRect();
+        reviewBox.style.left = `${sidebarRect.right + 5}px`;  // Position the reviewBox 10px to the right of the sidebar
+    }
+    // Create tabs container
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'tabsContainer';
+    tabsContainer.style.marginBottom = '10px';  // Adjust the value as needed
+    tabsContainer.style.display = 'flex';
+    tabsContainer.style.justifyContent = 'space-between';
+
+    const tabButtonStyle = `
+        flex: 1;
+        padding: 5px 15px;
+        background-color: #e10e10e10;
+        border: none;
+        border-radius: 5px 5px 0 0 ;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    `;
+    const activeTabStyle = `
+        background-color: #e9e9e9; 
+    `;
+
+    function updateTabAppearance() {
+        if (thumbnailsTab.classList.contains('active')) {
+            thumbnailsTab.style.fontSize = '14.5px';
+            thumbnailsTab.style.boxShadow = 'inset 0 0.2px 1px rgba(0, 0, 0, 0.2)';
+            thumbnailsTab.style.transform = 'scaleY(0.98)';
+            shortsTab.style.fontSize = '14px';
+            shortsTab.style.boxShadow = 'none';
+            shortsTab.style.transform = 'none';
+        } else {
+            shortsTab.style.fontSize = '14.5px';
+            shortsTab.style.boxShadow = 'inset 0 0.2px 1px rgba(0, 0, 0, 0.2)';
+            shortsTab.style.transform = 'scaleY(0.98)';
+            thumbnailsTab.style.fontSize = '14px';
+            thumbnailsTab.style.boxShadow = 'none';
+            thumbnailsTab.style.transform = 'none';
+        }
+    }
+
+    // Create Thumbnails tab
+    const thumbnailsTab = document.createElement('button');
+    thumbnailsTab.innerText = 'Thumbnails';
+    thumbnailsTab.className = 'tabButton active';
+    thumbnailsTab.style.cssText = tabButtonStyle + activeTabStyle;
+    thumbnailsTab.addEventListener('click', function () {
+        shortsContent.style.display = 'none';       // Hide Shorts content
+        thumbnailsContent.style.display = 'block';  // Show Thumbnails content
+        shortsTab.classList.remove('active');
+        shortsTab.style.cssText = tabButtonStyle;
+        thumbnailsTab.classList.add('active');
+        thumbnailsTab.style.cssText = tabButtonStyle + activeTabStyle;
+        updateTabAppearance();
+    });
+    // Create Shorts tab
+    const shortsTab = document.createElement('button');
+    shortsTab.innerText = 'Shorts';
+    shortsTab.className = 'tabButton';
+    shortsTab.style.cssText = tabButtonStyle;
+    shortsTab.addEventListener('click', function () {
+        thumbnailsContent.style.display = 'none';   // Hide Thumbnails content
+        shortsContent.style.display = 'block';      // Show Shorts content
+        thumbnailsTab.classList.remove('active');
+        thumbnailsTab.style.cssText = tabButtonStyle;
+        shortsTab.classList.add('active');
+        shortsTab.style.cssText = tabButtonStyle + activeTabStyle;
+        updateTabAppearance();
+    });
+
+    // Check if there are any shorts to display
+    if (shorts && shorts.length > 0) {
+        tabsContainer.appendChild(shortsTab);
+    }
+
+    // Append tabs to the container
+    tabsContainer.appendChild(thumbnailsTab);
+   // tabsContainer.appendChild(shortsTab);
+    reviewBox.appendChild(tabsContainer);
+
+    // Initial appearance update
+    updateTabAppearance();
+
+    // Create content containers for Thumbnails and Shorts
+    const thumbnailsContent = document.createElement('div');
+    thumbnailsContent.style.display = 'block';  // Initially show the Thumbnails content
+    const shortsContent = document.createElement('div');
+    shortsContent.style.display = 'none';  // Initially hide the Shorts content
+
+
+    // Populate the Thumbnails content
+    thumbnails.forEach((thumbnail, index) => {
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.marginBottom = '10px';
+        if (index !== thumbnails.length - 1) {
+            container.style.borderBottom = '1px solid lightgrey';
+        }
+        container.style.paddingBottom = '10px';
+
+        const img = document.createElement('img');
+        img.src = thumbnail.thumbnail_url;  
+        img.setAttribute('data-id', thumbnail.id);
+        img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
+        img.setAttribute('discord_thread_id', thumbnail.discord_thread_id);
+        img.setAttribute('discord_message_id', thumbnail.discord_message_id);
+        img.style.display = 'block';
+        img.width = 120;
+        img.style.marginRight = '15px';
+        img.style.borderRadius = '2px';
+        img.style.cursor = 'pointer';
+        img.className = 'thumbnail-image';
+        img.setAttribute('data-src', thumbnail.thumbnail_url);
+        img.onclick = function () {
+            viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);  // Ensure you're using the correct property from the thumbnail object
+        };
+
+
+         const desc = document.createElement('div');
+        desc.innerText = thumbnail.video_title || "No Title Available"; // This is where you can define what is displayed in description next to image
+        desc.style.flexGrow = '1';
+        desc.style.fontFamily = "YouTube Sans, sans-serif";
+        desc.style.fontSize = '15px';
+        desc.className = 'description';
+
+        container.appendChild(img);
+        container.appendChild(desc);
+        thumbnailsContent.appendChild(container);
+
+    });
+
+    shorts.forEach((short) => {
+            const container = document.createElement('div');
+        container.style.marginBottom = '10px';
+            if (short !== shorts[shorts.length - 1]) {
+        container.style.borderBottom = '1px solid lightgrey';
+        }
+        container.style.paddingBottom = '10px';
+
+            // Create a link element with the video title as its text
+            const titleLink = document.createElement('a');
+        titleLink.href = short.shorts_url;; // Assuming the URL property is named 'video_url'
+        titleLink.innerText = short.video_title || "No Title Available"; // Display the video title or a default message
+        titleLink.target = '_blank'; // Open the link in a new tab
+        titleLink.style.flexGrow = '1';
+        titleLink.style.fontFamily = "YouTube Sans, sans-serif";
+        titleLink.style.fontSize = '14px';
+        titleLink.style.color = '#007BFF'; // Give it a blue color to indicate it's a clickable link
+        titleLink.style.textDecoration = 'none'; // Remove the underline
+        titleLink.setAttribute('data-id', short.id);
+        titleLink.setAttribute('discord_channel_id', short.discord_channel_id);
+        titleLink.setAttribute('discord_thread_id', short.discord_thread_id);
+        titleLink.setAttribute('discord_message_id', short.discord_message_id);
+        titleLink.setAttribute('data-shorts-url', short.shorts_url);
+        titleLink.onclick = function(event) {
+        event.preventDefault(); // Prevent the default link behavior
+        viewShortFullscreen(short.shorts_url, shorts.indexOf(short), shorts);
+        };
+
+        // Append the title link to the container
+        container.appendChild(titleLink);
+
+        // Append the container to the shortsContent
+        shortsContent.appendChild(container);
+    });
+
+
+
+    // Append content containers to the review box
+        reviewBox.appendChild(thumbnailsContent);
+        reviewBox.appendChild(shortsContent);
+
+        return reviewBox;
+    }
+
+let currentThumbnailIndex = 0;
+function cycleToNextThumbnail(img, thumbnails) {
+    if (thumbnails[currentThumbnailIndex + 1]) {
+        currentThumbnailIndex++;
+        img.src = thumbnails[currentThumbnailIndex].thumbnail_url;
+        return thumbnails[currentThumbnailIndex].thumbnail_url;  // Return the new imageUrl
+    } else {
+        const fullscreenDiv = document.getElementById('fullscreenDiv');
+        if (fullscreenDiv) {
+            document.body.removeChild(fullscreenDiv);
+        }
+        return null;
+    }
+}
+
+
+
+function viewImageFullscreen(imageUrl, index, thumbnails) {
+        const fullscreenDiv = document.createElement('div');
+    fullscreenDiv.style.position = 'fixed';
+    fullscreenDiv.style.top = '0';
+    fullscreenDiv.style.left = '0';
+    fullscreenDiv.style.width = '100vw';
+    fullscreenDiv.style.height = '100vh';
+    fullscreenDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    fullscreenDiv.style.zIndex = '2000';
+    fullscreenDiv.style.display = 'flex';
+    fullscreenDiv.style.justifyContent = 'center';
+    fullscreenDiv.style.alignItems = 'center';
+    fullscreenDiv.id = 'fullscreenDiv';
+
+        const img = document.createElement('img');
+    img.src = imageUrl;
+    img.src = thumbnails[index].thumbnail_url;
+    img.style.maxWidth = '90%';
+    img.style.maxHeight = '90%';
+    img.style.borderRadius = '14px';
+    img.style.marginRight = '10px';
+
+        const approveBtn = document.createElement('button');
+    approveBtn.innerText = '✔';
+    approveBtn.style.backgroundColor = 'green';
+    approveBtn.style.color = 'white';
+    approveBtn.style.marginBottom = '10px';
+    approveBtn.style.border = 'none';
+    approveBtn.style.padding = '5px 10px';  // Increase the padding to make the button larger
+    approveBtn.style.borderRadius = '4px';  // Round the button corners
+    approveBtn.style.fontSize = '20px';  // Increase the font size for visibility
+    approveBtn.style.cursor = 'pointer';
+    approveBtn.onclick = function (event) {
+        console.log("Approve button clicked");
+        event.stopPropagation();
+        console.log(imageUrl + ' approved');
+        
+
+        // Find the associated thumbnail element in the review box
+        const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
+ 
+        // Add the 'approved' class to the container of the associated thumbnail
+        associatedThumbnailElement.closest('div').classList.add('approved');
+        associatedThumbnailElement.closest('div').style.display = 'none';
+
+        // Update the thumbnail status in the database
+        const thumbnailId = associatedThumbnailElement.getAttribute('data-id'); // Assuming you have a data-id attribute on the thumbnail element
+        updateThumbnailStatus(thumbnailId, 'approved');
+    
+        const newImageUrl = cycleToNextThumbnail(img, thumbnails);
+        if (newImageUrl) {
+        imageUrl = newImageUrl;
+
+    }
+};
+        
+        const reviseBtn = document.createElement('button');
+    reviseBtn.innerText = '✖';
+    reviseBtn.style.backgroundColor = 'red';
+    reviseBtn.style.color = 'white';
+    reviseBtn.style.border = 'none';
+    reviseBtn.style.padding = '5px 10px';  // Increase the padding to make the button larger
+    reviseBtn.style.borderRadius = '4px';  // Round the button corners
+    reviseBtn.style.fontSize = '20px';  // Increase the font size for visibility
+    reviseBtn.style.cursor = 'pointer';
+    reviseBtn.onclick = function (event) {
+        console.log("Revise button clicked");
+    event.stopPropagation();
+        const comment = prompt('Enter your revision request:', '');
+      if (comment) {
+        console.log('Revision for ' + imageUrl + ':', comment);
+            
+          const associatedThumbnailElement = document.querySelector(`[data-src="${imageUrl}"]`);
+
+          associatedThumbnailElement.closest('div').classList.add('revised');
+          associatedThumbnailElement.closest('div').style.display = 'none';
+
+          const thumbnailId = associatedThumbnailElement.getAttribute('data-id'); // Assuming you have a data-id attribute on the thumbnail element
+          updateThumbnailStatus(thumbnailId, 'revised', comment);
+ 
+          const newImageUrl = cycleToNextThumbnail(img, thumbnails);
+          if (newImageUrl) {
+            imageUrl = newImageUrl;
+
+        }
+    }
+};
+
+       const buttonContainer = document.createElement('div');
+       buttonContainer.style.display = 'flex';
+       buttonContainer.style.flexDirection = 'column';
+       buttonContainer.style.alignItems = 'flex-end';  // Align buttons to the right
+       buttonContainer.style.marginRight = '10px';  // Add some space on the right
+
+       buttonContainer.appendChild(approveBtn);
+       buttonContainer.appendChild(reviseBtn);
+
+       fullscreenDiv.appendChild(img);
+       fullscreenDiv.appendChild(buttonContainer);
+       document.body.appendChild(fullscreenDiv);
+
+       isFullscreenActive = true;
+
+       fullscreenDiv.addEventListener('click', function(event) {
+            console.log("Fullscreen div clicked");
+        event.stopPropagation();  // Stop the event from propagating to the document
+        fullscreenDiv.remove();
+
+       isFullscreenActive = false;
+    });
+
+}
+let currentShortIndex = 0;
+
+function cycleToNextShort(iframe, shortsArray, btn) {
+    console.log("Shorts array:", shortsArray);
+    console.log("Current short index:", currentShortIndex); // Add this log
+    console.log("Total number of shorts:", shortsArray.length);  // Add this log
+
+    if (shortsArray[currentShortIndex + 1]) {
+        currentShortIndex++;
+        const nextShort = shortsArray[currentShortIndex];
+        btn.short = nextShort;
+        console.log ("ns"+nextShort);
+        const fileIdMatch = nextShort.shorts_url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+        if (fileIdMatch) {
+            const fileId = fileIdMatch[1];
+            iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+            console.log("Cycling to next short:", iframe.src); // Add this log
+            return nextShort.shorts_url;
+        }
+    } else {
+        console.log("No more shorts to display"); // Add this log
+        const fullscreenDiv = document.getElementById('fullscreenDiv');
+        if (fullscreenDiv) {
+            fullscreenDiv.remove();
+        }
+        return null;
+    }
+}
+
+
+function viewShortFullscreen(driveUrl, index, shorts) {
+    allshorts = shorts;
+    // Extract the FILE_ID from the Google Drive URL
+    const fileIdMatch = driveUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (!fileIdMatch) {
+        console.error("Invalid Google Drive URL:", driveUrl);
+        return;
+    }
+    const fileId = fileIdMatch[1];
+
+    const fullscreenDiv = document.createElement('div');
+    fullscreenDiv.style.position = 'fixed';
+    fullscreenDiv.style.top = '0';
+    fullscreenDiv.style.left = '0';
+    fullscreenDiv.style.width = '100vw';
+    fullscreenDiv.style.height = '100vh';
+    fullscreenDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    fullscreenDiv.style.zIndex = '2000';
+    fullscreenDiv.style.display = 'flex';
+    fullscreenDiv.style.justifyContent = 'center';
+    fullscreenDiv.style.alignItems = 'center';
+    fullscreenDiv.id = 'fullscreenDiv';
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+    iframe.style.width = '90%';  // Adjust as needed
+    iframe.style.height = '90%'; // Adjust as needed
+    
+    iframe.style.borderRadius = '20px';
+    iframe.style.marginRight = '20px';
+    iframe.allowFullscreen = true;
+
+    const approveBtn = document.createElement('button');
+    approveBtn.innerText = '✔';
+    approveBtn.style.backgroundColor = 'green';
+    approveBtn.style.color = 'white';
+    approveBtn.style.marginBottom = '10px';
+    approveBtn.style.border = 'none';
+    approveBtn.style.padding = '5px 10px';
+    approveBtn.style.borderRadius = '4px';
+    approveBtn.style.fontSize = '20px';
+    approveBtn.style.cursor = 'pointer';
+    approveBtn.short = shorts[index];
+    approveBtn.onclick = function(event) {
+        event.stopPropagation();
+        var short = this.short;
+        console.log(this.short);
+        console.log(driveUrl + ' approved');
+        updateShortStatus(short.id, 'approved'); // Call the function to update the short status
+        // Find the associated short element in the list
+        const associatedShortElement = document.querySelector(`[data-id="${short.id}"]`);
+        // Hide the associated short
+        associatedShortElement.closest('div').style.display = 'none';
+        const newDriveUrl = cycleToNextShort(iframe, allshorts, approveBtn);
+        if (newDriveUrl) {
+            driveUrl = newDriveUrl;
+        }    
+    };
+
+    const reviseBtn = document.createElement('button');
+    reviseBtn.innerText = '✖';
+    reviseBtn.style.backgroundColor = 'red';
+    reviseBtn.style.color = 'white';
+    reviseBtn.style.border = 'none';
+    reviseBtn.style.padding = '5px 10px';
+    reviseBtn.style.borderRadius = '4px';
+    reviseBtn.style.fontSize = '20px';
+    reviseBtn.style.cursor = 'pointer';
+    reviseBtn.short = shorts[index];
+    reviseBtn.onclick = function(event) {
+        event.stopPropagation();
+        const comment = prompt('Enter your revision request:', '');
+        if (comment) {
+            var short = this.short;
+            console.log(this.short);
+            console.log('Revision for ' + driveUrl + ':', comment);
+            updateShortStatus(short.id, 'revised', comment); // Call the function to update the short status with a comment
+            // Find the associated short element in the list
+            const associatedShortElement = document.querySelector(`[data-id="${short.id}"]`);
+            // Hide the associated short
+            associatedShortElement.closest('div').style.display = 'none';
+
+            const newDriveUrl = cycleToNextShort(iframe, allshorts, reviseBtn);
+            if (newDriveUrl) {
+                driveUrl = newDriveUrl;
+            }
+        }   
+    };
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.flexDirection = 'column';
+    buttonContainer.style.alignItems = 'flex-end';
+
+    buttonContainer.appendChild(approveBtn);
+    buttonContainer.appendChild(reviseBtn);
+
+    fullscreenDiv.appendChild(iframe); // Append the iframe first
+    fullscreenDiv.appendChild(buttonContainer); // Then append the buttons
+    document.body.appendChild(fullscreenDiv);
+
+    fullscreenDiv.addEventListener('click', function() {
+        videoFullscreenClicked = true;  // Set the flag when the video fullscreen is clicked
+        fullscreenDiv.remove();
+    });
+}
+
+function createInputElements() {
+    const container = document.createElement('div');
+    container.className = 'input-container2';
+
+    const textBox = document.createElement('input');
+    textBox.type = 'text';
+    textBox.placeholder = 'Notes/Links...';
+
+    const checkBoxLabel = document.createElement('label');
+    const checkBox = document.createElement('input');
+    checkBox.type = 'checkbox';
+    checkBoxLabel.appendChild(checkBox);
+    checkBoxLabel.appendChild(document.createTextNode(' A/B '));
+
+    container.appendChild(checkBoxLabel);
+    container.appendChild(textBox);
+
+    return container;
+}
+
+// Callback function for the MutationObserver
+function handleMutations(mutationsList) {
+    for (let mutation of mutationsList) {
+        if (mutation.type === 'childList') {
+            const triggerElement = document.querySelector('h1.style-scope.ytcp-uploads-review');
+            const targetElement = document.querySelector('.right-button-area.style-scope.ytcp-uploads-dialog');
+            const existingToggleButton = document.querySelector('.toggle-button');
+
+            if (triggerElement && targetElement && !existingToggleButton && getComputedStyle(triggerElement).display !== 'none') {
+                console.log('Trigger element is visible!');
+
+                // Inject the toggle button
+                const toggleButton = document.createElement('button');
+                toggleButton.className = 'toggle-button';
+                toggleButton.addEventListener('click', handleToggleButton);
+
+                const toggleCircle = document.createElement('div');
+                toggleCircle.className = 'toggle-circle';
+                toggleButton.appendChild(toggleCircle);
+
+                targetElement.insertBefore(toggleButton, targetElement.firstChild);
+            }
+        }
+    }
+}
+
+let date, hour, title, videoLink;
+function attachDoneButtonListener() {
+    // Attach the event listener to the body or another persistent parent element
+    document.body.addEventListener('click', function (event) {
+        // Check if the clicked element is the "Done" button
+        if (event.target.closest('#done-button > div')) {
+            // Check if the toggle button is active
+            const toggleButton = document.querySelector('.toggle-button');
+            if (toggleButton && toggleButton.classList.contains('active')) {
+                gatherData()
+            }
+        }
+    });
+}
+// Call the function to start the process
+attachDoneButtonListener();
+
+function handleToggleButton() {
+    // Toggle the 'active' class for the button
+    this.classList.toggle('active');
+
+    const inputElements = document.querySelector('.input-container2');
+    if (this.classList.contains('active')) {
+        // If the toggle button is active, show the text box and checkbox
+        const elements = createInputElements();
+        this.parentNode.insertBefore(elements, this);
+    } else if (inputElements) {
+        // If the toggle button is inactive, remove the text box and checkbox
+        inputElements.remove();
+    }
+}
+
+function gatherData() {
+    // Check if the video is scheduled or not
+    const scheduleLabel = document.querySelector('#done-button > div').textContent.trim();
+
+    if (scheduleLabel === "Schedule") {
+        // Gather date and hour if the video is scheduled
+        date = document.querySelector('#datepicker-trigger > ytcp-dropdown-trigger > div > div.left-container.style-scope.ytcp-dropdown-trigger > span').textContent;
+        hour = document.querySelector('input.style-scope.tp-yt-paper-input').value;
+    } else {
+        // Set as "no date" if the video is not scheduled
+        date = "no date";
+        hour = "no time";
+    }
+
+    title = document.querySelector('div#title.style-scope.ytcp-uploads-dialog').textContent;
+    videoLink = document.querySelector('a.style-scope.ytcp-video-info').href;
+
+    console.log('channelId:', channelId);
+    console.log('Date:', date);
+    console.log('Hour:', hour);
+    console.log('Title:', title);
+    console.log('Video Link:', videoLink);
+
+    sendDataToServer2(channelId, date, hour, title, videoLink);
+}
+
+function sendDataToServer() {
+    console.log('Sending Date:', date);
+    console.log('Sending Hour:', hour);
+    console.log('Sending title:', title);
+    console.log('Sending link:', videoLink);
+
+    const url = "https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=newuploadrequest";
+
+    const inputTextValue = document.querySelector('.input-container2 input[type="text"]').value;
+    const isABTestingChecked = document.querySelector('.input-container2 input[type="checkbox"]').checked;
+
+    const volume = isABTestingChecked ? 2 : 1;
+
+    const requestBody = `channel_id=${channelId}&due_date=${date}&due_time=${hour}&video_title=${title}&video_link=${videoLink}&notes=${inputTextValue}&volume=${volume}`;
+
+    // Log the request body
+    console.log("Sending data:", requestBody);
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: requestBody
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function showMenu() {
+    // Logic to show the menu when the circle is clicked
+}
+
+// Add styles for the toggle button and circle
+const style = document.createElement('style');
+style.textContent = `
+    .toggle-container {
+        display: flex;
+        align-items: center;
+    }
+
+    .toggle-button {
+        width: 60px;
+        height: 30px;
+        border-radius: 15px;
+        background-color: #ccc;
+        position: relative;
+        cursor: pointer;
+        margin-right: 10px;
+        outline: none;
+        border: none;
+    }
+
+       .toggle-circle {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background-color: #fff; /* This will be the base background color */
+        //background-image: url('https://i.imgur.com/h95Pd0v.png'), radial-gradient(circle, #fff, #fff); 
+        /* The radial-gradient creates a circle of the same color as the background-color. 
+           This ensures that the image is drawn on top of a solid color. */
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 24px 24px, 100% 100%; /* Size of the icon and the gradient */
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        transition: left 0.3s;
+    }
+
+
+    .toggle-button.active {
+        background-color: #065fd4; /* Background color when the toggle button is active */
+    }
+
+    .toggle-button.active .toggle-circle {
+        left: 31px;
+    }
+    .input-container2 {
+        display: flex;
+        flex-direction: row; 
+        gap: 10px; 
+        align-items: center; 
+    }
+
+    .input-container2 > input[type="text"] {
+        margin-right: 10px;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .input-container2 > label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+`;
+
+document.head.appendChild(style);
+
+// Initialize the MutationObserver
+const observer = new MutationObserver(handleMutations);
+
+// Start observing changes in the document's body
+observer.observe(document.body, { childList: true, subtree: true });
+
+function updateThumbnailStatus(thumbnailId, status, revisionComment = null) {
+    const formData = new URLSearchParams();
+    formData.append('thumbnail_id', thumbnailId);
+    formData.append('status', status);
+    if (revisionComment) {
+        formData.append('revision_comment', revisionComment);
+    }
+
+    // First, update the database
+    fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=updateThumbnailStatus', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data.message);
+
+        const associatedThumbnailElement = document.querySelector(`[data-id="${thumbnailId}"]`);
+        if (!associatedThumbnailElement) {
+            console.error("Thumbnail element not found for thumbnailId:", thumbnailId);
+            return;
+        }
+      
+        const threadId = associatedThumbnailElement.getAttribute('discord_thread_id');
+        const messageId = associatedThumbnailElement.getAttribute('discord_message_id');
+
+        const requestData = {            
+            threadId:  String(threadId),
+            messageId: String(messageId),
+            status:    status
+        };
+
+        if (status === 'revised' && revisionComment) {
+            requestData.revisionComment = revisionComment;
+        }
+        console.log("Sending data:", requestData);
+
+        return fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/DiscordUpdatecurl.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+    })
+    .catch(error => {
+        console.error("Error:", error);
+    });
+}
+
+function updateShortStatus(shortId, status, revisionComment = null) {
+    const formData = new URLSearchParams();
+    formData.append('short_id', shortId);
+    formData.append('status', status);
+    if (revisionComment) {
+        formData.append('revision_comment', revisionComment);
+    }
+
+    // Assuming the PHP endpoint for updating short status is similar to the thumbnail one
+    fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/test.php?action=updateShortStatus', {
+        method: 'POST',
+        body: formData
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.message);
+
+            // Retrieve associated thumbnail attributes
+            const associatedShortElement = document.querySelector(`[data-id="${shortId}"]`);
+            if (!associatedShortElement) {
+                console.error("Thumbnail element not found for thumbnailId:", shortId);
+                return;
+            }
+           
+ 
+            const threadId = associatedShortElement.getAttribute('discord_thread_id');
+            const messageId = associatedShortElement.getAttribute('discord_message_id');
+          //  const driveUrl = associatedShortElement.getAttribute('data-shorts-url');
+
+            // Construct JSON data
+            const requestData = {
+                threadId: String(threadId),
+                messageId: String(messageId),
+                status: status
+            };
+
+            if (status === 'revised' && revisionComment) {
+                requestData.revisionComment = revisionComment;
+            }
+            console.log("Sending data:", requestData);
+            // Send JSON request to Discord update PHP script
+            return fetch('https://adloxs.marvelcrm.com/wp-content/plugins/adloxs/files/DiscordUpdatecurl.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.message);
+        })
+        .catch(error => {
+            console.error("Error:", error);
+        });
+}
+function injectStyles() {
+    console.log("Injecting styles...");
+    const styles = `
+        .approved .description {
+            text-decoration: line-through;
+            color: green;
+        }
+
+        .approved .thumbnail-image {
+            filter: brightness(50%) sepia(1) hue-rotate(100deg); /* green filter */
+        }
+
+        .revised .description {
+            text-decoration: line-through;
+            color: red;
+        }
+
+        .revised .thumbnail-image {
+            filter: brightness(70%) sepia(1) hue-rotate(0deg); /* red filter */
+        }
+         #fullscreenDiv img.slide-in {
+        animation: slideIn 0.5s forwards;
+        }
+
+        @keyframes slideIn {
+        from {
+            transform: translateX(-100%);
+        }
+        to {
+            transform: translateX(0);
+        }
+        .tabsContainer {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid grey;
+        margin-bottom: 10px;
+        }
+
+        .tabButton {
+        padding: 10px 20px;
+        cursor: pointer;
+        background-color: #f5f5f5;
+        border: none;
+        outline: none;
+        }
+
+        .tabButton.active {
+        background-color: #ddd;
+        }
+        
+        .tabsContainer {
+        margin-bottom: 20px; /* Adjust the value as needed */
+        }
+
+
+    }
+    `;
+
+    const styleSheet = document.createElement("style");
+    styleSheet.type = "text/css";
+    styleSheet.innerText = styles;
+    document.head.appendChild(styleSheet);
+}
+
+injectStyles(); // manually invoke the function
+
+document.addEventListener('click', function (event) {
+    const reviewBox = document.getElementById('adloxsReviewBox');
+
+    setTimeout(() => {
+        if (reviewBoxVisible && reviewBox && 
+            !reviewBox.contains(event.target) && 
+            !event.target.matches('.reviewButton') && 
+            !isFullscreenActive && 
+            !videoFullscreenClicked) {  // Check the new flag here
+            reviewBox.remove();
+            reviewBoxVisible = false;
+        }
+        videoFullscreenClicked = false;  // Reset the flag after checking
+    }, 1);
+});
+
+document.addEventListener('DOMContentLoaded', addReviewButton);
+
+const reviewButtonObserver = new MutationObserver(addReviewButton);
+reviewButtonObserver.observe(document.body, { childList: true, subtree: true });
