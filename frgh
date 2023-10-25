@@ -284,121 +284,13 @@ function addReviewButton() {
 
     }
 }
-function createThumbnailsReviewBox(thumbnails) {
-    const reviewBox = document.createElement('div');
-    reviewBox.className = 'thumbnailsReviewBoxClass';
-    reviewBox.id = 'thumbnailsReviewBox';
-    reviewBox.style.width = '25vw';
-    reviewBox.style.border = '1px solid #e0e0e0';
-    reviewBox.style.padding = '1rem';
-    reviewBox.style.position = 'fixed';
-    reviewBox.style.top = '7rem';
-    reviewBox.style.left = '20.5%';
-    reviewBox.style.backgroundColor = '#fff';
-    reviewBox.style.zIndex = '1000';
-    reviewBox.style.overflowY = 'auto';
-    reviewBox.style.borderRadius = '5px';
-    reviewBox.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
-    reviewBox.style.scrollbarWidth = 'none';
-
-    const styleElement = document.createElement('style');
-    styleElement.textContent = `
-        #thumbnailsReviewBox::-webkit-scrollbar {
-            display: none;
-        }
-    `;
-    document.head.appendChild(styleElement);
-
-    // Populate the Thumbnails content
-    thumbnails.forEach((thumbnail, index) => {
-        const container = document.createElement('div');
-        container.style.display = 'flex';
-        container.style.alignItems = 'center';
-        container.style.marginBottom = '10px';
-        if (index !== thumbnails.length - 1) {
-            container.style.borderBottom = '1px solid lightgrey';
-        }
-        container.style.paddingBottom = '10px';
-
-        const img = document.createElement('img');
-        img.src = thumbnail.thumbnail_url;
-        img.setAttribute('data-id', thumbnail.id);
-        img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
-        img.setAttribute('discord_thread_id', thumbnail.discord_thread_id);
-        img.setAttribute('discord_message_id', thumbnail.discord_message_id);
-        img.style.display = 'block';
-        img.width = 120;
-        img.style.marginRight = '15px';
-        img.style.borderRadius = '2px';
-        img.style.cursor = 'pointer';
-        img.className = 'thumbnail-image';
-        img.setAttribute('data-src', thumbnail.thumbnail_url);
-        img.onclick = function () {
-            viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);
-        };
-
-        const desc = document.createElement('div');
-        desc.innerText = thumbnail.video_title || "No Title Available";
-        desc.style.flexGrow = '1';
-        desc.style.fontFamily = "YouTube Sans, sans-serif";
-        desc.style.fontSize = '15px';
-        desc.className = 'description';
-
-        container.appendChild(img);
-        container.appendChild(desc);
-        reviewBox.appendChild(container);
-    });
-
-    return reviewBox;
-}
-
-function activateTab(tabElement) {
-    // Deactivate any currently active tabs
-    const activeTabs = document.querySelectorAll('.ytcp-content-section.iron-selected');
-    activeTabs.forEach(tab => {
-        tab.classList.remove('iron-selected');
-        tab.setAttribute('aria-selected', 'false');
-    });
-
-    // Activate the clicked tab
-    tabElement.classList.add('iron-selected');
-    tabElement.setAttribute('aria-selected', 'true');
-
-    // Move the blue marker to the clicked tab
-    const selectionBar = document.getElementById('selectionBar');
-    if (selectionBar) {
-        const tabPosition = tabElement.getBoundingClientRect().left;
-        const tabsContainerPosition = document.getElementById('tabsContainer').getBoundingClientRect().left;
-        const newPosition = tabPosition - tabsContainerPosition;
-        selectionBar.style.left = `${newPosition}px`;
-        selectionBar.style.width = `${tabElement.getBoundingClientRect().width}px`;
-    }
-
-    // Check if the clicked tab is the Thumbnails tab
-    if (tabElement.id === 'thumbnails-tab') {
-        // Fetch or generate your thumbnails data here
-        const thumbnailsData = []; // Replace this with actual data fetching or generation
-
-        // Create the thumbnails review box
-        const thumbnailsReviewBox = createThumbnailsReviewBox(thumbnailsData);
-
-        // Append the review box to the desired location on the page
-        // For this example, I'm appending it to the body, but you can choose a more specific location
-        const existingReviewBox = document.getElementById('thumbnailsReviewBox');
-        if (existingReviewBox) {
-            existingReviewBox.replaceWith(thumbnailsReviewBox);
-        } else {
-            document.body.appendChild(thumbnailsReviewBox);
-        }
-    }
-}
-
+// Function to create and add the Thumbnails tab
 function addThumbnailsTab() {
     const tabsContainer = document.getElementById('tabsContent');
     if (tabsContainer && !document.getElementById('thumbnails-tab')) {
         // Create a new tab for Thumbnails
         const thumbnailsTabElement = document.createElement('tp-yt-paper-tab');
-        thumbnailsTabElement.id = 'thumbnails-tab';
+        thumbnailsTabElement.id = 'thumbnails-tab'; // Assign a unique ID for the new tab
         thumbnailsTabElement.slot = 'tabs';
         thumbnailsTabElement.className = 'style-scope ytcp-content-section';
         thumbnailsTabElement.setAttribute('role', 'tab');
@@ -417,77 +309,24 @@ function addThumbnailsTab() {
         tabContentDiv.appendChild(tabSpan);
         thumbnailsTabElement.appendChild(tabContentDiv);
 
-        // Add click event listener to the Thumbnails tab
-        thumbnailsTabElement.addEventListener('click', () => {
-            activateTab(thumbnailsTabElement);
-            // TODO: Load the content associated with the Thumbnails tab
-        });
-
         // Append the new Thumbnails tab to the tabsContainer
         tabsContainer.appendChild(thumbnailsTabElement);
-
-        // Create content container for Thumbnails
-        const thumbnailsContent = document.createElement('div');
-        thumbnailsContent.id = 'thumbnails-content';
-
-
-        // Populate the Thumbnails content
-        thumbnails.forEach((thumbnail, index) => {
-            const container = document.createElement('div');
-            container.style.display = 'flex';
-            container.style.alignItems = 'center';
-            container.style.marginBottom = '10px';
-            if (index !== thumbnails.length - 1) {
-                container.style.borderBottom = '1px solid lightgrey';
-            }
-            container.style.paddingBottom = '10px';
-
-            const img = document.createElement('img');
-            img.src = thumbnail.thumbnail_url;
-            img.setAttribute('data-id', thumbnail.id);
-            img.setAttribute('discord_channel_id', thumbnail.discord_channel_id);
-            img.setAttribute('discord_thread_id', thumbnail.discord_thread_id);
-            img.setAttribute('discord_message_id', thumbnail.discord_message_id);
-            img.style.display = 'block';
-            img.width = 120;
-            img.style.marginRight = '15px';
-            img.style.borderRadius = '2px';
-            img.style.cursor = 'pointer';
-            img.className = 'thumbnail-image';
-            img.setAttribute('data-src', thumbnail.thumbnail_url);
-            img.onclick = function () {
-                viewImageFullscreen(thumbnail.thumbnail_url, index, thumbnails);
-            };
-
-            const desc = document.createElement('div');
-            desc.innerText = thumbnail.video_title || "No Title Available";
-            desc.style.flexGrow = '1';
-            desc.style.fontFamily = "YouTube Sans, sans-serif";
-            desc.style.fontSize = '15px';
-            desc.className = 'description';
-
-            container.appendChild(img);
-            container.appendChild(desc);
-            thumbnailsContent.appendChild(container);
-        });
-
-        // Append the content section to the main content container
-        const mainContentContainer = document.querySelector('.main-content-container-selector'); // Replace with the appropriate selector for the main content container
-        mainContentContainer.appendChild(thumbnailsContent);
-
         return true;  // Return true if the tab was added
     }
     return false;  // Return false if the tab wasn't added
 }
 
+// Recursive setTimeout function
 function checkAndAddTab() {
     if (!addThumbnailsTab()) {
         setTimeout(checkAndAddTab, 2000);  // If tab wasn't added, check again in 2 seconds
     }
 }
 
+// Start the initial check
 checkAndAddTab();
 
+// Use MutationObserver to detect when the tabsContainer might be added to the page
 const tabsObserver = new MutationObserver((mutationsList) => {
     for (let mutation of mutationsList) {
         if (mutation.type === 'childList') {
@@ -496,8 +335,8 @@ const tabsObserver = new MutationObserver((mutationsList) => {
     }
 });
 
+// Start observing the document with the configured parameters
 tabsObserver.observe(document.body, { childList: true, subtree: true });
-
 
 function createReviewBox(thumbnails, shorts) {
     const reviewBox = document.createElement('div');
